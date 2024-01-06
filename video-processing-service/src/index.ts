@@ -1,58 +1,83 @@
 import express from "express";
-import ffmpeg from "fluent-ffmpeg";
+
+import { 
+    uploadProcessedVideo,
+    uploadThumbnail,
+    downloadRawVideo,
+    deleteRawVideo,
+    deleteProcessedVideo,
+    deleteThumbnail,
+    convertVideo,
+    makeThumbnail,
+    setupDirectories
+  } from './storage';
 
 const app = express();
 app.use(express.json());
 
-app.post("/process-video", (req, res) => {
-    // get path of the input video file from request body
-    const inputFilePath = req.body.inputFilePath;
-    const outputFilePath = req.body.outputFilePath;
-
-    if (!inputFilePath || !outputFilePath){
-        res.status(400).send("bad request: missing file path.");
+// Process a video file from Cloud Storage into 360p and create a thumbnail
+app.post("/process-video-and-make-thumbnail", async (req, res) => {
+  // Get the bucket and filename from the Cloud Pub/Sub message
+  let data;
+  try {
+    const message = Buffer.from(req.body.message.data, 'base64').toString('utf8');
+    data = JSON.parse(message);
+    if (!data.name) {
+      throw new Error('Invalid message payload received.');
     }
+  } catch (error) {
+    console.error(error);
+    return res.status(400).send('Bad Request: missing filename.');
+  }
 
-    ffmpeg(inputFilePath)
-        .outputOptions(['-vf', 'scale=360:-1']) // 360p
-        .on('end', function() {
-            console.log('Processing finished successfully');
-            res.status(200).send('Processing finished successfully');
-        })
-        .on('error', function(err: any) {
-            console.log('An error occurred: ' + err.message);
-            res.status(500).send('An error occurred: ' + err.message);
-        })
-        .save(outputFilePath);
-});
+  const inputFileName = data.name;
+  const outputFileName = `processed-${inputFileName}`;
+  const thumbnailFileName = `thumbnail-${inputFileName}`;
 
-app.post("/make-thumbnail", (req, res) => {
-    // get path of the input video file from request body
-    const videoFilePath = req.body.videoFilePath;
-    const thumbnailFilePath = req.body.thumbnailFilePath;
+  // Download the raw video from Cloud Storage
+  await downloadRawVideo(inputFileName);
 
-    if (!videoFilePath || !thumbnailFilePath){
-        res.status(400).send("bad request: missing file path.");
-    }
+  // Process the video into 360p
+  try { 
+    await convertVideo(inputFileName, outputFileName)
+  } catch (err) {
+    await Promise.all([
+      deleteRawVideo(inputFileName),
+      deleteProcessedVideo(outputFileName)
+    ]);
+    console.log(err);
+    return res.status(500).send('Processing failed');
+  }
+  
+  // Upload the processed video to Cloud Storage
+  await uploadProcessedVideo(outputFileName);
 
-    ffmpeg(videoFilePath)
-        .takeScreenshots({
-            filename: thumbnailFilePath,
-            count: 1
-        })
-        .on('end', function() {
-            console.log('Processing finished successfully');
-            res.status(200).send('Processing finished successfully');
-        })
-        .on('error', function(err: any) {
-            console.log('An error occurred: ' + err.message);
-            res.status(500).send('An error occurred: ' + err.message);
-        })
+  // make thumbnail
+  try { 
+    await makeThumbnail(thumbnailFileName, outputFileName)
+  } catch (err) {
+    await Promise.all([
+      deleteRawVideo(thumbnailFileName)
+    ]);
+    console.log(err);
+    return res.status(500).send('Thumbnail failed');
+  }
+  
+  // Upload the thumbnail to Cloud Storage
+  await uploadThumbnail(thumbnailFileName);
+
+  await Promise.all([
+    deleteRawVideo(inputFileName),
+    deleteProcessedVideo(outputFileName),
+    deleteProcessedVideo(thumbnailFileName)
+  ]);
+
+  return res.status(200).send('Processing and thumbnail creation finished successfully');
 });
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
     console.log(
-        `Video processing service listening at http://localhost:${port}`
+        `Server is running on port: ${port}`
     );
 });
