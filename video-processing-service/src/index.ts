@@ -12,6 +12,10 @@ import {
     setupDirectories
   } from './storage';
 
+
+// set up directories?
+setupDirectories();
+
 const app = express();
 app.use(express.json());
 
@@ -57,7 +61,8 @@ app.post("/process-video-and-make-thumbnail", async (req, res) => {
     await makeThumbnail(thumbnailFileName, outputFileName)
   } catch (err) {
     await Promise.all([
-      deleteRawVideo(thumbnailFileName)
+      deleteRawVideo(outputFileName),
+      deleteThumbnail(thumbnailFileName)
     ]);
     console.log(err);
     return res.status(500).send('Thumbnail failed');
@@ -69,7 +74,7 @@ app.post("/process-video-and-make-thumbnail", async (req, res) => {
   await Promise.all([
     deleteRawVideo(inputFileName),
     deleteProcessedVideo(outputFileName),
-    deleteProcessedVideo(thumbnailFileName)
+    deleteThumbnail(thumbnailFileName)
   ]);
 
   return res.status(200).send('Processing and thumbnail creation finished successfully');
