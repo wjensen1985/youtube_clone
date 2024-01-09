@@ -30,9 +30,9 @@ export function setupDirectories() {
 export function convertVideo(rawVideoName: string, processedVideoName: string) {
   return new Promise<void>((resolve, reject) => {
     ffmpeg(`${localRawVideoPath}/${rawVideoName}`)
-      .outputOptions("-vf", "scale=-1:360") // 360p
+      .outputOptions("-vf", "scale=360:-1") // 360p
       .on("end", function () {
-        console.log("Processing finished successfully");
+        console.log("Convert video processing finished successfully");
         resolve();
       })
       .on("error", function (err: any) {
@@ -56,7 +56,7 @@ export function makeThumbnail(thumbnailName: string, processedVideoName: string)
         count: 1
         })
         .on('end', function() {
-            console.log('Processing finished successfully');
+            console.log('Make thumbnail processing finished successfully');
             resolve();
         })
         .on('error', function(err: any) {
@@ -117,11 +117,11 @@ export async function uploadThumbnail(fileName: string) {
 
   // Upload video to the bucket
   await storage.bucket(thumbnailsBucketName)
-    .upload(`${localProcessedVideoPath}/${fileName}`, {
+    .upload(`${localThumbnailsPath}/${fileName}`, {
       destination: fileName,
     });
   console.log(
-    `${localProcessedVideoPath}/${fileName} uploaded to gs://${thumbnailsBucketName}/${fileName}.`
+    `${localThumbnailsPath}/${fileName} uploaded to gs://${thumbnailsBucketName}/${fileName}.`
   );
 
   // Set the video to be publicly readable

@@ -36,7 +36,8 @@ app.post("/process-video-and-make-thumbnail", async (req, res) => {
 
   const inputFileName = data.name;
   const outputFileName = `processed-${inputFileName}`;
-  const thumbnailFileName = `thumbnail-${inputFileName}`;
+  const strippedInputFile = inputFileName.split('.')[0];
+  const thumbnailFileName = `thumbnail-${strippedInputFile}.jpg`;
 
   // Download the raw video from Cloud Storage
   await downloadRawVideo(inputFileName);
@@ -61,7 +62,7 @@ app.post("/process-video-and-make-thumbnail", async (req, res) => {
     await makeThumbnail(thumbnailFileName, outputFileName)
   } catch (err) {
     await Promise.all([
-      deleteRawVideo(outputFileName),
+      deleteProcessedVideo(outputFileName),
       deleteThumbnail(thumbnailFileName)
     ]);
     console.log(err);
@@ -71,18 +72,27 @@ app.post("/process-video-and-make-thumbnail", async (req, res) => {
   // Upload the thumbnail to Cloud Storage
   await uploadThumbnail(thumbnailFileName);
 
-  await Promise.all([
+  Promise.all([
     deleteRawVideo(inputFileName),
     deleteProcessedVideo(outputFileName),
     deleteThumbnail(thumbnailFileName)
-  ]);
+  ])
+    .then( () => {
+      console.log('delete all files success (hopefully)');
+      return res.status(200).send('Processing and thumbnail creation finished successfully');
+    })
+    .catch((error) => {
+      console.log(error);
+      return res.status(500).send('Delete files promise failed');
+    })
 
-  return res.status(200).send('Processing and thumbnail creation finished successfully');
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(
         `Server is running on port: ${port}`
     );
 });
+
+server.setTimeout(0);
