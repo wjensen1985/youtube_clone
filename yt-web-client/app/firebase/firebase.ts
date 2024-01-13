@@ -10,10 +10,13 @@ import {
     User
 } from "firebase/auth";
 
+import { getFunctions } from "firebase/functions";
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
 const auth = getAuth(app);
+export const functions = getFunctions();
 
 /**
  * Signs the user in with a Google popup.
