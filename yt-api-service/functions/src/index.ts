@@ -13,6 +13,17 @@ const storage = new Storage();
 const rawVideoBucketName = "whwj-yt-clone-raw-videos";
 // const processedVideoBucketName = "whwj-yt-clone-processed-videos";
 // const thumbnailsBucketName = "whwj-yt-clone-thumbnails";
+const videoCollectionId = "videos";
+
+export interface Video {
+  id?: string,
+  uid?: string,
+  filename?: string,
+  status?: "processing" | "processed",
+  title?: string,
+  description?: string,
+  thumbnailFilename?: string
+}
 
 export const generateUploadUrl = onCall({maxInstances: 1}, async (request) => {
   if (!request.auth) {
@@ -42,4 +53,10 @@ export const createUser = functions.auth.user().onCreate((user) => {
   firestore.collection("users").doc(user.uid).set(userInfo);
   logger.info(`User Created: ${JSON.stringify(userInfo)}`);
   return;
+});
+
+export const getVideos = onCall({maxInstances: 1}, async () => {
+  const querySnapshot =
+    await firestore.collection(videoCollectionId).limit(10).get();
+  return querySnapshot.docs.map((doc) => doc.data());
 });
