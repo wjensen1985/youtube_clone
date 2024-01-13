@@ -12,6 +12,7 @@ import {
     setupDirectories
   } from './storage';
 
+import { isVideoNew, setVideo } from "./firestore";
 
 // set up directories?
 setupDirectories();
@@ -34,10 +35,20 @@ app.post("/process-video-and-make-thumbnail", async (req, res) => {
     return res.status(400).send('Bad Request: missing filename.');
   }
 
-  const inputFileName = data.name;
+  const inputFileName = data.name; // format <uid>-<date>.<extension>
   const outputFileName = `processed-${inputFileName}`;
-  const strippedInputFile = inputFileName.split('.')[0];
-  const thumbnailFileName = `thumbnail-${strippedInputFile}.jpg`;
+  const videoId = inputFileName.split('.')[0];
+  const thumbnailFileName = `thumbnail-${videoId}.jpg`;
+  
+  if (!isVideoNew(videoId)){
+    return res.status(400).send('Bad Request: video already processing or processed.');
+  } else {
+    await setVideo(videoId, {
+      id: videoId,
+      uid: videoId.split('-')[0],
+      status: 'processing',
+    });
+  }
 
   // Download the raw video from Cloud Storage
   await downloadRawVideo(inputFileName);
@@ -71,6 +82,12 @@ app.post("/process-video-and-make-thumbnail", async (req, res) => {
   
   // Upload the thumbnail to Cloud Storage
   await uploadThumbnail(thumbnailFileName);
+
+  await setVideo(videoId, {
+    status: 'processed',
+    filename: outputFileName,
+    thumbnailFilename: thumbnailFileName
+  })
 
   Promise.all([
     deleteRawVideo(inputFileName),
