@@ -1,3 +1,2 @@
 # youtube_clone
-# youtube_clone
-## testing hotkeys/settings here
+## live demo hosted here: https://yt-web-client-bpmf4mrjdq-uc.a.run.app/
